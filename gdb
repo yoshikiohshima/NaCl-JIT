@@ -1,0 +1,1 @@
+nacl-gdb --loader nacl-sel_ldr --annotate=3 /home/ohshima/src/native_client_sdk_0_2_803_0/examples/foo/myjit.nexe
