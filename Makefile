@@ -6,6 +6,8 @@
 
 .PHONY: all clean
 
+DYNAMIC_CODE_SIZE = 0x30000
+
 CFILES = 
 
 NACL_SDK_ROOT = ../..
@@ -16,9 +18,9 @@ LDFLAGS = \
           -lpthread \
           -lplatform \
           -lgio \
-	  -Wl,--section-start=.rodata=0x00070000 \
 	  $(ARCH_FLAGS)
 OPT_FLAGS = -O2
+#	  -Wl,--section-start=.rodata=0x00070000 \
 
 all: check_variables myjit.nmf myjit_dbg.nmf
 
@@ -54,9 +56,17 @@ myjit_x86_64_dbg.nexe: $(OBJECTS_X86_64_DBG)
 clean:
 	-$(RM) *.nmf *.o *.obj *.nexe
 
-myjit.nexe: myjit.c
-	$(CC) $(CFLAGS) $(DEBUG_FLAGS) $(LDFLAGS) -o $@ $<
+myjit_tmp.nexe: myjit.c
+	$(CC) $(CFLAGS) -DETEXT=0x400000 -DDYNAMIC_CODE_SIZE=$(DYNAMIC_CODE_SIZE) $(DEBUG_FLAGS) $(LDFLAGS) -o $@ $<
 
+myjit.nexe: myjit_tmp.nexe
+	ETEXT=0x$(shell sh -x -c "$(NACL_SDK_ROOT)/$(NACL_TOOLCHAIN_DIR)/bin/nacl-nm $< | awk -f get-etext.awk") $(MAKE) compile-myjit
+
+compile-myjit:
+	$(CC) $(CFLAGS) -DETEXT=$(ETEXT) -DDYNAMIC_CODE_SIZE=$(DYNAMIC_CODE_SIZE) $(DEBUG_FLAGS) $(LDFLAGS) \
+	  -Wl,--section-start=.rodata=$(shell sh -c "printf '0x%x' $$(($(ETEXT)+$(DYNAMIC_CODE_SIZE)))") \
+	-o myjit.nexe myjit.c
+	@rm -f myjit_tmp.nexe
 
 # This target is used by the SDK build system to produce a pre-built version
 # of the .nexe.  You do not need to call this target.

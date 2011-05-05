@@ -8,7 +8,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-extern char etext[];
+extern char *etext;
 
 #if defined(__x86_64__)
 /* On x86-64, template functions do not fit in 32-byte buffers */
@@ -27,23 +27,22 @@ extern char etext[];
 #error "Unknown Platform"
 #endif
 
-#define DYNAMIC_CODE_SEGMENT_START (((((uint32_t)etext) + 0x10000 + 0xFFFF) / 0x10000) * 0x10000)
-#define DYNAMIC_CODE_SEGMENT_END   0x00070000 /* the number specified in the Makefile for rodata start */
-
+#define DYNAMIC_CODE_SEGMENT_START ETEXT
+#define DYNAMIC_CODE_SEGMENT_END (DYNAMIC_CODE_SEGMENT_START+DYNAMIC_CODE_SIZE)
 static char *next_addr;
+
+static char *allocate_code_space(int pages) {
+  char *addr = next_addr;
+  next_addr += 0x10000 * pages;
+  assert(next_addr <= (char *) DYNAMIC_CODE_SEGMENT_END);
+  return addr;
+}
 
 int nacl_load_code(void *dest, void *src, int size) {
   int rc = nacl_dyncode_create(dest, src, size);
   /* Undo the syscall wrapper's errno handling, because it's more
      convenient to test a single return value. */
   return rc == 0 ? 0 : -errno;
-}
-
-char *allocate_code_space(int pages) {
-  char *addr = next_addr;
-  next_addr += 0x10000 * pages;
-  assert(next_addr < (char *) DYNAMIC_CODE_SEGMENT_END);
-  return addr;
 }
 
 void fill_nops(uint8_t *data, size_t size) {
@@ -90,7 +89,10 @@ main(int ac, char *av[])
   void *load_area;
   int (*func)();
 
-  next_addr = (char *) DYNAMIC_CODE_SEGMENT_START;
+  next_addr = (char*)DYNAMIC_CODE_SEGMENT_START;
+
+  assert((uint32_t)etext);
+
   load_area = allocate_code_space(1);
   copy_and_pad_fragment(buf, sizeof(buf), (const char*)foo, (const char *)(foo+15));
 
