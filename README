@@ -1,0 +1,4 @@
+A tiny test of dynamic code generation on Google Native Client.
+
+It is largely borrowed from the test code for NaCl and stiched in to
+the hello world example.
